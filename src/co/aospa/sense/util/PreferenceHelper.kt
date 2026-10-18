@@ -67,6 +67,67 @@ class PreferenceHelper(context: Context) {
         return PreferenceManager.getDefaultSharedPreferences(mContext).getBoolean(key, false)
     }
 
+    fun getEnrolledFaceIds(): List<Int> {
+        val raw = getStringValueByKey(Constants.SHARED_KEY_FACE_IDS)
+        if (!TextUtils.isEmpty(raw)) {
+            val list = raw!!.split(",").mapNotNull { it.trim().toIntOrNull() }
+            if (list.isNotEmpty()) return list
+        }
+        val singleId = getIntValueByKey(Constants.SHARED_KEY_FACE_ID)
+        return if (singleId > 0) listOf(singleId) else emptyList()
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun addEnrolledFaceId(faceId: Int) {
+        val current = getEnrolledFaceIds().toMutableList()
+        if (!current.contains(faceId)) {
+            current.add(faceId)
+        }
+        saveStringValue(Constants.SHARED_KEY_FACE_IDS, current.joinToString(","))
+        saveIntValue(Constants.SHARED_KEY_FACE_ID, faceId)
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun removeEnrolledFaceId(faceId: Int) {
+        val current = getEnrolledFaceIds().toMutableList()
+        current.remove(faceId)
+        if (current.isNotEmpty()) {
+            saveStringValue(Constants.SHARED_KEY_FACE_IDS, current.joinToString(","))
+            saveIntValue(Constants.SHARED_KEY_FACE_ID, current.last())
+        } else {
+            removeSharePreferences(Constants.SHARED_KEY_FACE_ID)
+            removeSharePreferences(Constants.SHARED_KEY_FACE_IDS)
+        }
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun clearEnrolledFaceIds() {
+        removeSharePreferences(Constants.SHARED_KEY_FACE_IDS)
+        removeSharePreferences(Constants.SHARED_KEY_FACE_ID)
+    }
+
+    fun saveTokenForFace(faceId: Int, token: ByteArray?) {
+        saveByteArrayValue("${Constants.SHARED_KEY_ENROLL_TOKEN}_$faceId", token)
+        saveByteArrayValue(Constants.SHARED_KEY_ENROLL_TOKEN, token)
+    }
+
+    fun getTokenForFace(faceId: Int): ByteArray? {
+        val token = getByteArrayValueByKey("${Constants.SHARED_KEY_ENROLL_TOKEN}_$faceId")
+        return token ?: getByteArrayValueByKey(Constants.SHARED_KEY_ENROLL_TOKEN)
+    }
+
+    fun removeTokenForFace(faceId: Int) {
+        removeSharePreferences("${Constants.SHARED_KEY_ENROLL_TOKEN}_$faceId")
+    }
+
+    fun getBiometricMode(): Int {
+        return getIntValueByKey(Constants.SHARED_KEY_BIOMETRIC_MODE, Constants.MODE_FULL_FACE)
+    }
+
+    fun setBiometricMode(mode: Int) {
+        saveIntValue(Constants.SHARED_KEY_BIOMETRIC_MODE, mode)
+    }
+
     init {
         mContext = context.applicationContext
     }

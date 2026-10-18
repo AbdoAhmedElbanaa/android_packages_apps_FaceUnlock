@@ -6,7 +6,16 @@ object Constants {
     const val EXTRA_KEY_LAUNCHED_CONFIRM = "launched_confirm_lock"
     const val SHARED_KEY_ENROLL_TOKEN = "token"
     const val SHARED_KEY_FACE_ID = "name"
+    const val SHARED_KEY_FACE_IDS = "enrolled_face_ids"
+    const val SHARED_KEY_BIOMETRIC_MODE = "biometric_mode"
+    const val SHARED_KEY_EYE_TEMPLATES = "enrolled_eye_templates"
     const val SHARED_KEY_SDK_VERSION = "sdk_version"
+
+    const val MAX_ENROLLMENTS = 5
+
+    const val MODE_FULL_FACE = 0
+    const val MODE_EYE_ONLY = 1
+    const val MODE_DUAL_SECURITY = 2
 
     const val MSG_UNLOCK_DARKLIGHT = 30
     const val MSG_UNLOCK_FACE_BLUR = 28

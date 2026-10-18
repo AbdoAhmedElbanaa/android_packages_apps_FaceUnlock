@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">خدمة فتح القفل بالوجه</string>
+
+    <!-- Enroll activity -->
+    <string name="face_enroll_title">وجّه وجهك في منتصف الكاميرا</string>
+    <string name="face_enroll_description">ابقَ ثابتاً وتأكد من وجودك في مكان جيد الإضاءة</string>
+
+    <!-- Try Again activity -->
+    <string name="face_try_again_title">تعذر التقاط وجهك</string>
+    <string name="face_try_again_description">اضغط بالأسفل للمحاولة مجدداً. تأكد من جودة الإضاءة وعدم حجب ملامحك</string>
+    <string name="btn_try_again">إعادة المحاولة</string>
+
+    <!-- Vendor Messages -->
+    <string name="attr_light_dark">الإضاءة ضعيفة للغاية</string>
+    <string name="attr_light_high">الإضاءة ساطعة جداً</string>
+    <string name="attr_light_shadow">توجد ظلال كثيرة على الوجه</string>
+    <string name="unlock_failed_face_blur">الصورة مشوشة، يرجى التثبيت</string>
+    <string name="unlock_failed_face_large">الوجه قريب جداً من الكاميرا</string>
+    <string name="unlock_failed_face_multi">تم اكتشاف أكثر من وجه</string>
+    <string name="unlock_failed_face_not_complete">لم يتم التقاط الوجه بالكامل</string>
+    <string name="unlock_failed_face_small">الوجه بعيد جداً عن الكاميرا</string>
+
+    <!-- Eye / Iris Unlock -->
+    <string name="eye_unlock_title">التعرف على بصمة العين والقزحية</string>
+    <string name="eye_enroll_title">حاذِ عينيك داخل الإطار</string>
+    <string name="eye_enroll_description">انظر مباشرة إلى الكاميرا وأبقِ عينيك مفتوحتين</string>
+    <string name="eye_not_detected">لم يتم رصد العينين بوضوح</string>
+    <string name="eye_look_at_camera">يرجى النظر مباشرة نحو عدسة الكاميرا</string>
+    <string name="eye_open_eyes">أبقِ عينيك مفتوحتين بالكامل</string>
+</resources>

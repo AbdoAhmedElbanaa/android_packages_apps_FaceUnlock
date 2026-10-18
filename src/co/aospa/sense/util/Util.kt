@@ -26,7 +26,7 @@ object Util {
 
     fun isFaceUnlockEnrolled(context: Context?): Boolean {
         val preferenceHelper = PreferenceHelper(context!!)
-        return preferenceHelper.getIntValueByKey(Constants.SHARED_KEY_FACE_ID) > 0 && preferenceHelper.getByteArrayValueByKey(
+        return preferenceHelper.getEnrolledFaceIds().isNotEmpty() && preferenceHelper.getByteArrayValueByKey(
             Constants.SHARED_KEY_ENROLL_TOKEN
         ) != null
     }

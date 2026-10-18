@@ -24,6 +24,7 @@ import co.aospa.sense.util.SenseUserContext
 import co.aospa.sense.util.Util
 import co.aospa.sense.vendor.Vendor
 import co.aospa.sense.vendor.VendorImpl
+import co.aospa.sense.eye.EyeRecognitionEngine
 
 import java.lang.StringBuilder
 import java.util.*
@@ -121,26 +122,55 @@ class SenseService : Service() {
     private val mCameraAuthControllerCallback: FaceAuthenticationController.ServiceCallback =
         object : FaceAuthenticationController.ServiceCallback {
             override fun handlePreviewData(data: ByteArray?, width: Int, height: Int): Int {
-                val imageData = IntArray(20)
-                if (Util.IS_DEBUG_LOGGING) {
-                    Log.d(TAG, "handleData start")
+                val mode = mPreferenceHelper?.getBiometricMode() ?: Constants.MODE_FULL_FACE
+                var isMatch = false
+                var finalResult = -1
+
+                if (mode == Constants.MODE_EYE_ONLY) {
+                    if (data != null) {
+                        val eyeCandidate = EyeRecognitionEngine.extractEyeBiometrics(data, width, height)
+                        if (eyeCandidate != null) {
+                            val enrolledEyes = EyeRecognitionEngine.loadEnrolledEyeTemplates(mUserContext)
+                            val matchedId = EyeRecognitionEngine.matchCandidate(eyeCandidate, enrolledEyes)
+                            if (matchedId > 0) {
+                                isMatch = true
+                                finalResult = 0
+                            }
+                        }
+                    }
+                } else if (mode == Constants.MODE_DUAL_SECURITY) {
+                    val imageData = IntArray(20)
+                    val faceResult = mVendorImpl!!.compare(data, width, height, 0, true, true, imageData)
+                    if (faceResult == 0 && data != null) {
+                        val eyeCandidate = EyeRecognitionEngine.extractEyeBiometrics(data, width, height)
+                        if (eyeCandidate != null) {
+                            val enrolledEyes = EyeRecognitionEngine.loadEnrolledEyeTemplates(mUserContext)
+                            val eyeMatch = EyeRecognitionEngine.matchCandidate(eyeCandidate, enrolledEyes)
+                            if (eyeMatch > 0 || enrolledEyes.isEmpty()) {
+                                isMatch = true
+                                finalResult = 0
+                            }
+                        }
+                    }
+                } else {
+                    val imageData = IntArray(20)
+                    val faceResult = mVendorImpl!!.compare(data, width, height, 0, true, true, imageData)
+                    finalResult = faceResult
+                    if (faceResult == 0) {
+                        isMatch = true
+                    }
                 }
-                val result = mVendorImpl!!.compare(data, width, height, 0, true, true, imageData)
-                if (Util.IS_DEBUG_LOGGING) Log.d(
-                    TAG, "handlePreviewData result = " + result +
-                            " run: fake = " + imageData[0] + ", low = " + imageData[1] +
-                            ", compare score:" + imageData[2] + " live score:" + imageData[3].toDouble() / 100.0
-                )
+
                 synchronized(this) {
                     if (mCameraAuthController == null) {
                         return -1
                     }
-                    if (result == 0) {
+                    if (isMatch) {
                         mIsAuthenticated = true
                         mCameraAuthController!!.stop()
                     }
                 }
-                return result
+                return finalResult
             }
 
             override fun setDetectArea(size: Camera.Size?) {
@@ -210,16 +240,14 @@ class SenseService : Service() {
                 try {
                     val faceIds = imageData[0] + 1
                     if (result == 0) {
-                        val faceId: Int =
-                            mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID)
-                        if (faceId > 0) {
-                            mVendorImpl!!.deleteFeature(faceId)
+                        mPreferenceHelper!!.addEnrolledFaceId(faceIds)
+                        mPreferenceHelper!!.saveTokenForFace(faceIds, mEnrollToken)
+                        if (data != null) {
+                            val eyeBio = EyeRecognitionEngine.extractEyeBiometrics(data, width, height, faceIds)
+                            if (eyeBio != null) {
+                                EyeRecognitionEngine.saveEyeTemplate(mUserContext, eyeBio)
+                            }
                         }
-                        mPreferenceHelper!!.saveIntValue(Constants.SHARED_KEY_FACE_ID, faceIds)
-                        mPreferenceHelper!!.saveByteArrayValue(
-                            Constants.SHARED_KEY_ENROLL_TOKEN,
-                            mEnrollToken
-                        )
                         Util.setFaceUnlockAvailable(mUserContext)
                         stopEnroll()
                         mSenseReceiver?.onEnrollResult(faceIds, mUserId, 0)
@@ -356,12 +384,13 @@ class SenseService : Service() {
 
     private fun onAuthenticated() {
         try {
+            val enrolled = mPreferenceHelper!!.getEnrolledFaceIds()
+            val faceId = if (enrolled.isNotEmpty()) enrolled[0] else mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID)
+            val token = mPreferenceHelper!!.getTokenForFace(faceId) ?: mPreferenceHelper!!.getByteArrayValueByKey(Constants.SHARED_KEY_ENROLL_TOKEN)
             mSenseReceiver?.onAuthenticated(
-                mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID),
+                faceId,
                 mUserId,
-                mPreferenceHelper!!.getByteArrayValueByKey(
-                    Constants.SHARED_KEY_ENROLL_TOKEN
-                )
+                token
             )
             resetLockoutCount()
             stopAuthentication()
@@ -521,12 +550,6 @@ class SenseService : Service() {
                 }
             } else {
                 mEnrollToken = cryptoToken
-                val faceId: Int = mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID)
-                if (faceId > 0) {
-                    mVendorImpl!!.deleteFeature(faceId - 1)
-                    mPreferenceHelper!!.removeSharePreferences(Constants.SHARED_KEY_FACE_ID)
-                    mPreferenceHelper!!.removeSharePreferences(Constants.SHARED_KEY_ENROLL_TOKEN)
-                }
                 resetLockoutCount()
                 mWorkHandler!!.post {
                     mVendorImpl!!.saveFeatureStart()
@@ -601,35 +624,44 @@ class SenseService : Service() {
 
         override fun remove(biometricId: Int) {
             activateUser()
-            if (Util.IS_DEBUG_LOGGING) Log.d(TAG, "remove")
+            if (Util.IS_DEBUG_LOGGING) Log.d(TAG, "remove biometricId=$biometricId")
             mWorkHandler!!.post {
-                val faceId: Int = mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID)
-                if (!(biometricId == 0 || faceId == biometricId)) {
-                    Log.e(TAG, "Removing biometricId: $biometricId")
-                }
-                mVendorImpl!!.deleteFeature(faceId - 1)
-                mPreferenceHelper!!.removeSharePreferences(Constants.SHARED_KEY_FACE_ID)
-                mPreferenceHelper!!.removeSharePreferences(Constants.SHARED_KEY_ENROLL_TOKEN)
-                Util.setFaceUnlockAvailable(mUserContext)
-                try {
-                    if (biometricId == 0) {
-                        mSenseReceiver?.onRemoved(intArrayOf(faceId), mUserId)
-                    } else {
-                        mSenseReceiver?.onRemoved(intArrayOf(biometricId), mUserId)
+                val enrolled = mPreferenceHelper!!.getEnrolledFaceIds()
+                if (biometricId == 0) {
+                    for (id in enrolled) {
+                        mVendorImpl!!.deleteFeature(id - 1)
+                        mPreferenceHelper!!.removeTokenForFace(id)
                     }
-                } catch (e: RemoteException) {
-                    e.printStackTrace()
+                    EyeRecognitionEngine.clearAllEyeTemplates(mUserContext)
+                    mPreferenceHelper!!.clearEnrolledFaceIds()
+                    Util.setFaceUnlockAvailable(mUserContext)
+                    try {
+                        mSenseReceiver?.onRemoved(enrolled.toIntArray(), mUserId)
+                    } catch (e: RemoteException) {
+                        e.printStackTrace()
+                    }
+                } else {
+                    mVendorImpl!!.deleteFeature(biometricId - 1)
+                    EyeRecognitionEngine.deleteEyeTemplate(mUserContext, biometricId)
+                    mPreferenceHelper!!.removeEnrolledFaceId(biometricId)
+                    mPreferenceHelper!!.removeTokenForFace(biometricId)
+                    Util.setFaceUnlockAvailable(mUserContext)
+                    try {
+                        mSenseReceiver?.onRemoved(intArrayOf(biometricId), mUserId)
+                    } catch (e: RemoteException) {
+                        e.printStackTrace()
+                    }
                 }
             }
         }
 
         override fun enumerate(): Int {
             activateUser()
-            val faceId: Int = mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID)
-            val faceIds = if (faceId > -1) intArrayOf(faceId) else IntArray(0)
+            val enrolled = mPreferenceHelper!!.getEnrolledFaceIds()
+            val faceIds = enrolled.toIntArray()
             mWorkHandler!!.post {
                 try {
-                    if (Util.IS_DEBUG_LOGGING) Log.d(TAG, "enumerate = $mSenseReceiver")
+                    if (Util.IS_DEBUG_LOGGING) Log.d(TAG, "enumerate = $mSenseReceiver, ids=${faceIds.contentToString()}")
                     if (mSenseReceiver == null) {
                         try {
                             Thread.sleep(50)
@@ -649,7 +681,7 @@ class SenseService : Service() {
 
         override fun getFeatureCount(): Int {
             activateUser()
-            return if (mPreferenceHelper!!.getIntValueByKey(Constants.SHARED_KEY_FACE_ID) > -1) 1 else 0
+            return mPreferenceHelper!!.getEnrolledFaceIds().size
         }
 
         override fun generateChallenge(timeout: Int): Long {

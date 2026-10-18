@@ -20,4 +20,12 @@
     <string name="unlock_failed_face_multi">Too many faces detected</string>
     <string name="unlock_failed_face_not_complete">Only partial face detected</string>
     <string name="unlock_failed_face_small">Face is too far away</string>
+
+    <!-- Eye / Iris Unlock -->
+    <string name="eye_unlock_title">Eye &amp; Iris Recognition</string>
+    <string name="eye_enroll_title">Align your eyes in the frame</string>
+    <string name="eye_enroll_description">Look directly at the camera and keep your eyes open</string>
+    <string name="eye_not_detected">Eyes not detected clearly</string>
+    <string name="eye_look_at_camera">Please look directly at the camera</string>
+    <string name="eye_open_eyes">Keep your eyes fully open</string>
 </resources>
