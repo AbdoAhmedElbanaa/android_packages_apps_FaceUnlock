@@ -122,12 +122,31 @@ class SenseService : Service() {
     private val mCameraAuthControllerCallback: FaceAuthenticationController.ServiceCallback =
         object : FaceAuthenticationController.ServiceCallback {
             override fun handlePreviewData(data: ByteArray?, width: Int, height: Int): Int {
-                val mode = mPreferenceHelper?.getBiometricMode() ?: Constants.MODE_FULL_FACE
+                val mode = try {
+                    android.provider.Settings.Secure.getIntForUser(
+                        mUserContext.contentResolver,
+                        "face_unlock_biometric_mode",
+                        mPreferenceHelper?.getBiometricMode() ?: Constants.MODE_FULL_FACE,
+                        mUserId
+                    )
+                } catch (e: Exception) {
+                    mPreferenceHelper?.getBiometricMode() ?: Constants.MODE_FULL_FACE
+                }
+                val eyeKeyguardEnabled = try {
+                    android.provider.Settings.Secure.getIntForUser(
+                        mUserContext.contentResolver,
+                        "eye_unlock_keyguard_enabled",
+                        1,
+                        mUserId
+                    ) == 1
+                } catch (e: Exception) {
+                    true
+                }
                 var isMatch = false
                 var finalResult = -1
 
                 if (mode == Constants.MODE_EYE_ONLY) {
-                    if (data != null) {
+                    if (eyeKeyguardEnabled && data != null) {
                         val eyeCandidate = EyeRecognitionEngine.extractEyeBiometrics(data, width, height)
                         if (eyeCandidate != null) {
                             val enrolledEyes = EyeRecognitionEngine.loadEnrolledEyeTemplates(mUserContext)
@@ -142,14 +161,19 @@ class SenseService : Service() {
                     val imageData = IntArray(20)
                     val faceResult = mVendorImpl!!.compare(data, width, height, 0, true, true, imageData)
                     if (faceResult == 0 && data != null) {
-                        val eyeCandidate = EyeRecognitionEngine.extractEyeBiometrics(data, width, height)
-                        if (eyeCandidate != null) {
-                            val enrolledEyes = EyeRecognitionEngine.loadEnrolledEyeTemplates(mUserContext)
-                            val eyeMatch = EyeRecognitionEngine.matchCandidate(eyeCandidate, enrolledEyes)
-                            if (eyeMatch > 0 || enrolledEyes.isEmpty()) {
-                                isMatch = true
-                                finalResult = 0
+                        if (eyeKeyguardEnabled) {
+                            val eyeCandidate = EyeRecognitionEngine.extractEyeBiometrics(data, width, height)
+                            if (eyeCandidate != null) {
+                                val enrolledEyes = EyeRecognitionEngine.loadEnrolledEyeTemplates(mUserContext)
+                                val eyeMatch = EyeRecognitionEngine.matchCandidate(eyeCandidate, enrolledEyes)
+                                if (eyeMatch > 0 || enrolledEyes.isEmpty()) {
+                                    isMatch = true
+                                    finalResult = 0
+                                }
                             }
+                        } else {
+                            isMatch = true
+                            finalResult = 0
                         }
                     }
                 } else {
@@ -158,6 +182,16 @@ class SenseService : Service() {
                     finalResult = faceResult
                     if (faceResult == 0) {
                         isMatch = true
+                    } else if (eyeKeyguardEnabled && data != null) {
+                        val eyeCandidate = EyeRecognitionEngine.extractEyeBiometrics(data, width, height)
+                        if (eyeCandidate != null) {
+                            val enrolledEyes = EyeRecognitionEngine.loadEnrolledEyeTemplates(mUserContext)
+                            val eyeMatch = EyeRecognitionEngine.matchCandidate(eyeCandidate, enrolledEyes)
+                            if (eyeMatch > 0) {
+                                isMatch = true
+                                finalResult = 0
+                            }
+                        }
                     }
                 }
 

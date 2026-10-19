@@ -33,6 +33,19 @@
             android:theme="@style/SudThemeGlifV4.DayNight" />
 
         <activity
+            android:name=".activities.EyeEnrollActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="standard"
+            android:screenOrientation="portrait"
+            android:theme="@style/SudThemeGlifV4.DayNight">
+            <intent-filter>
+                <action android:name="co.aospa.sense.action.ENROLL_EYE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".activities.TryAgainActivity"
             android:excludeFromRecents="true"
             android:launchMode="standard"

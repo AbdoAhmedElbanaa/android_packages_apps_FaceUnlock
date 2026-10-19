@@ -276,12 +276,35 @@ object EyeRecognitionEngine {
         for (t in templates) {
             jsonArr.put(t.toJson())
         }
-        helper.saveStringValue(Constants.SHARED_KEY_EYE_TEMPLATES, jsonArr.toString())
+        val serialized = jsonArr.toString()
+        helper.saveStringValue(Constants.SHARED_KEY_EYE_TEMPLATES, serialized)
+        try {
+            android.provider.Settings.Secure.putStringForUser(
+                context.contentResolver,
+                Constants.SHARED_KEY_EYE_TEMPLATES,
+                serialized,
+                Util.getUserId(context)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save eye templates to Settings.Secure", e)
+        }
     }
 
     fun loadEnrolledEyeTemplates(context: Context): List<EyeBiometrics> {
         val helper = PreferenceHelper(context)
-        val raw = helper.getStringValueByKey(Constants.SHARED_KEY_EYE_TEMPLATES) ?: return emptyList()
+        var raw = helper.getStringValueByKey(Constants.SHARED_KEY_EYE_TEMPLATES)
+        if (raw.isNullOrEmpty()) {
+            try {
+                raw = android.provider.Settings.Secure.getStringForUser(
+                    context.contentResolver,
+                    Constants.SHARED_KEY_EYE_TEMPLATES,
+                    Util.getUserId(context)
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load eye templates from Settings.Secure", e)
+            }
+        }
+        if (raw.isNullOrEmpty()) return emptyList()
         val list = ArrayList<EyeBiometrics>()
         try {
             val jsonArr = JSONArray(raw)
@@ -304,11 +327,32 @@ object EyeRecognitionEngine {
         for (t in templates) {
             jsonArr.put(t.toJson())
         }
-        helper.saveStringValue(Constants.SHARED_KEY_EYE_TEMPLATES, jsonArr.toString())
+        val serialized = jsonArr.toString()
+        helper.saveStringValue(Constants.SHARED_KEY_EYE_TEMPLATES, serialized)
+        try {
+            android.provider.Settings.Secure.putStringForUser(
+                context.contentResolver,
+                Constants.SHARED_KEY_EYE_TEMPLATES,
+                serialized,
+                Util.getUserId(context)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete eye template from Settings.Secure", e)
+        }
     }
 
     fun clearAllEyeTemplates(context: Context) {
         val helper = PreferenceHelper(context)
         helper.removeSharePreferences(Constants.SHARED_KEY_EYE_TEMPLATES)
+        try {
+            android.provider.Settings.Secure.putStringForUser(
+                context.contentResolver,
+                Constants.SHARED_KEY_EYE_TEMPLATES,
+                "",
+                Util.getUserId(context)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear eye templates from Settings.Secure", e)
+        }
     }
 }
